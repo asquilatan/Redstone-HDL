@@ -1,36 +1,142 @@
-# Research: Extended Redstone Features
+# Research: Advanced Debugging & Components
 
-## 1. Camera Controls (Ursina)
-**Decision**: Implement a custom `SpectatorController` class.
-**Rationale**: The built-in `FirstPersonController` enforces gravity and collision, which is undesirable for inspecting large redstone circuits. `EditorCamera` is orbital, which is good for objects but bad for flying through circuits.
-**Implementation Details**:
-- Inherit from `Entity`.
-- Update position based on `held_keys` (w, a, s, d, space, shift).
-- Update rotation based on mouse input.
-- Speed multiplier with scroll wheel.
+## 1. Debug Assertions & Manual State
 
-## 2. Redstone Mechanics
-### 2.1 Slime & Honey Blocks
-**Decision**: Implement a recursive "Block Cluster" finder in `KinematicSafety`.
-**Rationale**: Piston pushes are limited to 12 blocks. Slime/Honey blocks recursively pull/push attached blocks.
-**Rules**:
-- Slime sticks to Slime and non-slime blocks.
-- Honey sticks to Honey and non-honey blocks.
-- Slime does NOT stick to Honey.
-- Glazed Terracotta, Obsidian, Bedrock, etc. are non-sticky/immovable.
+**Problem**: Users need to verify circuit state and manually manipulate it during debugging.
+**Solution**:
+- **Grammar**: Add `assert` keyword and method call syntax (already exists).
+- **Implementation**:
+  - `assert(condition)`: Evaluated during simulation.
+  - `block.setPosition(x,y,z)`: Updates `VoxelGrid` directly.
+  - `block.setFacing(dir)`: Updates `properties`.
 
-### 2.2 Target Blocks
-**Decision**: Treat Target Blocks as "strongly powered" components that attract wire connections.
-**Rationale**: In Minecraft, redstone wire automatically redirects to point at a Target Block. The `Solver` (A*) needs to cost connections to Target Blocks favorably or explicitly route to them.
+**Decision**: Implement `assert` as a statement and expose `VoxelGrid` manipulation methods to the interpreter.
 
-### 2.3 Repeaters & Comparators
-**Decision**:
-- **Repeater**: Model as a directed component with `delay` (1-4) and `locked` state.
-- **Comparator**: Model as a component with `mode` (compare/subtract).
-**Rationale**: Essential for logic gates and timing.
+## 2. Smart Redstone
 
-## 3. Unknowns Resolved
-- **Immovable Blocks**: Defined list (Obsidian, Bedrock, etc.).
-- **Moveable Blocks**: All standard blocks + Honey/Slime special interactions.
-- **Viewer Performance**: Instancing is handled by Ursina's `Mesh` or `Entity` parenting. For 10k blocks, we might need to combine meshes if performance drops, but individual entities are fine for now.
+**Problem**: Redstone wire doesn't visually connect to neighbors.
+**Solution**:
+- **Visuals**: In `VoxelRenderer`, check neighbors (N, S, E, W) for powerable components.
+- **Logic**: `VoxelGrid` already handles connectivity via `RedstoneSimulator`.
+- **Implementation**: Update `render_grid` to select correct texture/model (dot, line, cross) based on neighbors.
+
+## 3. Custom Objects (Modules)
+
+**Problem**: Users want to define reusable components (e.g., `DoublePistonExtender`).
+**Solution**:
+- **Grammar**: Add `module Name { ... }` syntax.
+- **Instantiation**: `instance = Name(args)`.
+- **Implementation**: Treat modules as macros that expand into the main graph.
+
+## 4. Repeater Position Bug
+
+**Problem**: Components appear in random positions.
+**Solution**:
+- **Cause**: `LogicalGraph` uses `uuid.uuid4()` for component IDs. The solver likely iterates over these IDs.
+- **Fix**: Use deterministic IDs based on component name (e.g., `repeater_1`) or sequence index.
+
+## 5. Debug Mode CLI
+
+**Problem**: "See the entire schema after each iteration".
+**Solution**:
+- **CLI**: Add `--debug` flag.
+- **Behavior**: Pause after each simulation tick or step, print state, allow user input (step, continue).
+- **Naming**: `{block_type}.png`
+- **Location**: `src/redscript/viewer/textures/`
+
+**Required Textures**:
+| File | Description |
+|------|-------------|
+| `stone.png` | Gray stone |
+| `piston.png` | Piston face (wood + gray) |
+| `sticky_piston.png` | Piston with green slime |
+| `redstone_wire.png` | Red dust pattern |
+| `repeater.png` | Repeater top view |
+| `comparator.png` | Comparator top view |
+| `lever.png` | Lever on stone |
+| `lamp_off.png` | Brown lamp |
+| `lamp_on.png` | Yellow glowing lamp |
+| `button.png` | Stone button |
+| `observer.png` | Observer face |
+| `slime.png` | Green translucent |
+| `honey.png` | Orange translucent |
+| `target.png` | Red/white bullseye |
+| `redstone_torch.png` | Red torch glow |
+
+---
+
+## 7. Block Info Display (NEW)
+
+**Question**: How to show block information when looking at a block?
+
+**Decision**: Extend raycast to include block type and properties in UI.
+
+**Rationale**:
+- Already have raycasting for coordinates
+- Store `block_data` on entity for metadata
+- Display: `Looking at: Repeater (delay=2) @ (5, 3, 10)`
+
+---
+
+## 8. Litematica Export (NEW)
+
+**Question**: How to export to `.litematic` file?
+
+**Decision**: Use `litemapy` library (already a dependency).
+
+**Rationale**:
+- Listed in `requirements.txt` and `setup.py`
+- Direct API for creating Litematica schematics
+- Already have `LitematicaSerializer` stub
+
+**Implementation**:
+```python
+from litemapy import Schematic, Region, BlockState
+
+def export_litematic(voxel_grid: VoxelGrid, path: str, name: str = "RedScript Export"):
+    # Calculate bounds
+    # Create Region with BlockStates
+    # Save schematic
+```
+
+## 9. Advanced Control Flow & Materials (NEW)
+
+**Decision**: Adopt C-style/Python-hybrid syntax for loops and conditionals.
+
+**Rationale**:
+- The existing language uses `{}` for blocks.
+- `for i in range(start, end)` is familiar.
+- `if (condition)` is standard.
+
+**Proposed Grammar**:
+```lark
+for_loop: FOR_KW CNAME "in" range_expr "{" statement* "}"
+range_expr: "range" "(" value "," value ")"
+if_stmt: IF_KW "(" condition ")" "{" statement* "}" (ELSE_KW "{" statement* "}")?
+FOR_KW: "for"
+IF_KW: "if"
+ELSE_KW: "else"
+```
+
+**Glass Block Behavior**:
+- **Redstone Connectivity**: Redstone dust can be placed on top.
+- **Diagonal Connectivity**: Does *not* cut redstone signals traveling diagonally.
+- **Transparency**: Visually transparent.
+
+**Parameterized Modules**:
+- Extend `ModuleDefinition` to support variable substitution in parameters.
+- Support simple arithmetic expressions (`+`, `-`, `*`, `/`) in values.
+
+
+---
+
+## Summary Table
+
+| Component | Technology | Status |
+|-----------|------------|--------|
+| Block Interaction | Ursina `on_click` | Ready |
+| Redstone Simulation | `RedstoneSimulator` class | Design complete |
+| Block Textures | 16x16 PNG files | Need samples |
+| Block Info Display | Extend raycast UI | Ready |
+| Litematica Export | `litemapy` | Ready |
 

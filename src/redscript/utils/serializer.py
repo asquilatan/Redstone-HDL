@@ -3,7 +3,11 @@ Litematica Serializer: Export voxel grids to .litematic format
 """
 import sys
 from pathlib import Path
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Any, TYPE_CHECKING
+from dataclasses import dataclass
+
+if TYPE_CHECKING:
+    from redscript.compiler.voxel_grid import VoxelGrid
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
@@ -14,6 +18,20 @@ except ImportError:
     LITEMAPY_AVAILABLE = False
     BlockState = None
 
+@dataclass
+class LitematicaMetadata:
+    """Metadata for exported schematic"""
+    name: str = "RedScript Export"
+    author: str = "RedScript Compiler"
+    description: str = ""
+    region_name: str = "Main"
+    
+@dataclass  
+class ExportOptions:
+    """Options for Litematica export"""
+    include_support_blocks: bool = True  # Include stone under redstone
+    include_air: bool = False            # Export air blocks
+    offset: Tuple[int, int, int] = (0, 0, 0)  # Position offset
 
 class LitematicaSerializer:
     """Serializes voxel grids to Minecraft Litematica format"""
@@ -43,25 +61,53 @@ class LitematicaSerializer:
         if not LITEMAPY_AVAILABLE:
             raise ImportError("litemapy not installed. Install with: pip install litemapy")
         
-        # TODO: Calculate grid bounds
-        min_x = min_y = min_z = 0
-        max_x = max_y = max_z = 16
+        if not voxel_grid.blocks:
+            return False
+            
+        # Calculate grid bounds
+        xs = [x for x, _, _ in voxel_grid.blocks.keys()]
+        ys = [y for _, y, _ in voxel_grid.blocks.keys()]
+        zs = [z for _, _, z in voxel_grid.blocks.keys()]
         
-        # TODO: Create litemapy Region with blocks
-        # region = Region((min_x, min_y, min_z), (max_x, max_y, max_z))
+        min_x, max_x = min(xs), max(xs)
+        min_y, max_y = min(ys), max(ys)
+        min_z, max_z = min(zs), max(zs)
         
-        # TODO: Iterate through voxel_grid.blocks and add to region
+        width = max_x - min_x + 1
+        height = max_y - min_y + 1
+        length = max_z - min_z + 1
         
-        # TODO: Save to file
-        # region.save(output_path)
+        # Create litemapy Region
+        reg = Region(0, 0, 0, width, height, length)
+        schem = reg.as_schematic(name="RedScript Export", author="RedScript", description="Exported from RedScript")
         
+        for (x, y, z), block in voxel_grid.blocks.items():
+            # Map to region coordinates
+            rx = x - min_x
+            ry = y - min_y
+            rz = z - min_z
+            
+            # Get block state
+            block_state = LitematicaSerializer.get_block_state(block.material, block.properties)
+            
+            # Set block
+            reg.setblock(rx, ry, rz, block_state)
+            
+        # Save
+        schem.save(output_path)
         return True
     
     @classmethod
-    def get_block_state(cls, material: str, properties: Dict = None) -> 'BlockState':
+    def get_block_state(cls, material: str, properties: Dict = None) -> Any:
         """Map material + properties to Minecraft BlockState"""
-        mapping = cls._get_block_state_mapping()
-        return mapping.get(
-            material,
-            BlockState('stone')  # Default fallback
-        )
+        if not LITEMAPY_AVAILABLE:
+            return None
+            
+        name = material
+        
+        props = {}
+        if properties:
+            for k, v in properties.items():
+                props[k] = str(v)
+                
+        return BlockState(name, **props)

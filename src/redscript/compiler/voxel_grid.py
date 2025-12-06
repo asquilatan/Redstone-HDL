@@ -34,9 +34,7 @@ class VoxelGrid:
         }
     
     def set_block(self, x: int, y: int, z: int, block: Block) -> None:
-        """Place a block at the given coordinates"""
-        if not self._is_in_bounds(x, y, z):
-            raise ValueError(f"Coordinates ({x}, {y}, {z}) out of bounds")
+        """Place a block at the given coordinates (sparse storage, no bounds check)"""
         self.blocks[(x, y, z)] = block
     
     def get_block(self, x: int, y: int, z: int) -> Optional[Block]:
@@ -54,12 +52,9 @@ class VoxelGrid:
             del self.blocks[(x, y, z)]
     
     def _is_in_bounds(self, x: int, y: int, z: int) -> bool:
-        """Check if coordinates are within bounds"""
-        return (
-            self.bounds['min_x'] <= x <= self.bounds['max_x'] and
-            self.bounds['min_y'] <= y <= self.bounds['max_y'] and
-            self.bounds['min_z'] <= z <= self.bounds['max_z']
-        )
+        """Check if coordinates are within reasonable limits (sparse storage allows any coords)"""
+        # Sparse storage: allow any coordinates, serializer normalizes them
+        return True
     
     def get_neighbors(self, x: int, y: int, z: int) -> list:
         """Get all neighboring voxels (6 directions: ±X, ±Y, ±Z)"""

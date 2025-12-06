@@ -9,15 +9,19 @@ from typing import Optional
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 try:
-    from ursina import Ursina, camera, held_keys, Vec3 as UrsVec3, window, color, Text
+    from ursina import Ursina, camera, held_keys, Vec3 as UrsVec3, window, color, Text, Entity, invoke, Func
     from ursina.prefabs.first_person_controller import FirstPersonController
     URSINA_AVAILABLE = True
 except ImportError:
     URSINA_AVAILABLE = False
+    Entity = object
+    color = None
+    Text = None
 
 from redscript.compiler.voxel_grid import VoxelGrid
 from redscript.viewer.renderer import VoxelRenderer
 from redscript.viewer.controls import SpectatorController
+from redscript.viewer.simulator import RedstoneSimulator
 
 class VoxelViewer:
     """3D viewer for voxel grids using Ursina"""
@@ -32,6 +36,10 @@ class VoxelViewer:
         self.voxel_entities = []
         self.controls = None
         self.border_entity = None
+        
+        # Input handling
+        self.input_entity = Entity()
+        self.input_entity.input = self.input
         
         # UI Info text (black text on light background)
         self.info_text = Text(
@@ -52,6 +60,15 @@ class VoxelViewer:
             text="Looking at: None",
             position=(-0.85, -0.45),
             scale=1,
+            color=color.black
+        )
+        
+        # Crosshair
+        self.crosshair = Text(
+            text='+',
+            position=(0, 0),
+            origin=(0, 0),
+            scale=2,
             color=color.black
         )
     
@@ -101,8 +118,11 @@ class VoxelViewer:
         from ursina import Entity, Vec3
         self.grid_parent = Entity()
         
+        # Initialize simulator
+        self.simulator = RedstoneSimulator(voxel_grid)
+        
         # Render new grid attached to parent
-        self.voxel_entities = VoxelRenderer.render_grid(voxel_grid, parent_entity=self.grid_parent)
+        self.voxel_entities = VoxelRenderer.render_grid(voxel_grid, parent_entity=self.grid_parent, simulator=self.simulator)
         
         # Create border
         self.border_entity = Entity(
@@ -125,6 +145,25 @@ class VoxelViewer:
             
         # Camera looks at (0,0,0)
         self.controls.setup_for_grid((0, 0, 0))
+
+    def input(self, key):
+        if key == 'f10':
+            self.export_schematic()
+            
+    def export_schematic(self):
+        """Export current grid to litematic"""
+        print("Exporting to export.litematic...")
+        from redscript.utils.serializer import LitematicaSerializer
+        if self.simulator and hasattr(self.simulator, 'voxel_grid'):
+            try:
+                LitematicaSerializer.serialize(self.simulator.voxel_grid, "export.litematic")
+                print("Export successful!")
+                self.info_text.text = "Exported to export.litematic!"
+                invoke(Func(setattr, self.info_text, 'text', "Controls: WASD Move | Space/Shift Up/Down | Mouse Look | Scroll Speed | ESC Unlock"), delay=3)
+            except Exception as e:
+                print(f"Export failed: {e}")
+                self.info_text.text = f"Export failed: {e}"
+                invoke(Func(setattr, self.info_text, 'text', "Controls: WASD Move | Space/Shift Up/Down | Mouse Look | Scroll Speed | ESC Unlock"), delay=3)
 
     def run(self):
         """Run the viewer application"""

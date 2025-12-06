@@ -5,6 +5,20 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Tuple
 import uuid
 from enum import Enum
+from collections import defaultdict
+
+class IDGenerator:
+    """Generates deterministic IDs for components and connections"""
+    _counters = defaultdict(int)
+
+    @classmethod
+    def generate(cls, prefix: str = "id") -> str:
+        cls._counters[prefix] += 1
+        return f"{prefix}_{cls._counters[prefix]}"
+    
+    @classmethod
+    def reset(cls):
+        cls._counters.clear()
 
 class ComponentType(Enum):
     """Types of redstone components"""
@@ -23,6 +37,10 @@ class ComponentType(Enum):
     REDSTONE_TORCH = "redstone_torch"
     PRESSURE_PLATE = "pressure_plate"
     BUTTON = "button"
+    STONE = "stone"
+    GLASS = "glass"
+    REDSTONE_WIRE = "redstone_wire"
+    GLAZED_TERRACOTTA = "glazed_terracotta"
 
 class SignalType(Enum):
     """Types of signals"""
@@ -32,7 +50,7 @@ class SignalType(Enum):
 @dataclass
 class Port:
     """A connection point on a component"""
-    id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
+    id: str = field(default_factory=lambda: IDGenerator.generate("port"))
     name: str = "default"
     component_id: str = ""
     offset: Tuple[int, int, int] = (0, 0, 0)  # Relative to component origin
@@ -43,7 +61,7 @@ class Port:
 @dataclass
 class Component:
     """A logical unit (piston, repeater, etc.)"""
-    id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
+    id: str = field(default_factory=lambda: IDGenerator.generate("comp"))
     type: ComponentType = ComponentType.PISTON
     position: Tuple[int, int, int] = (0, 0, 0)  # World position
     dimensions: Tuple[int, int, int] = (1, 1, 1)
@@ -61,12 +79,18 @@ class Component:
 @dataclass
 class Connection:
     """A logical link between ports"""
-    id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
+    id: str = field(default_factory=lambda: IDGenerator.generate("conn"))
     source_port_id: str = ""
     target_port_id: str = ""
     min_delay: int = 0  # Ticks
     max_delay: int = 0
     signal_strength: int = 15
+
+@dataclass
+class Assertion:
+    """A debug assertion"""
+    condition: str
+    message: str = "Assertion failed"
 
 class LogicalGraph:
     """Graph of components and connections"""
@@ -74,6 +98,11 @@ class LogicalGraph:
     def __init__(self):
         self.components: Dict[str, Component] = {}
         self.connections: Dict[str, Connection] = {}
+        self.assertions: List[Assertion] = []
+    
+    def add_assertion(self, assertion: Assertion) -> None:
+        """Add a debug assertion"""
+        self.assertions.append(assertion)
     
     def add_component(self, component: Component) -> str:
         """Add a component to the graph"""

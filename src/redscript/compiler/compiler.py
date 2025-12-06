@@ -106,6 +106,18 @@ class Compiler:
         ComponentType.BUTTON: [
             ((0, 0, 0), "minecraft:stone_button", {"face": "floor", "facing": "north"}),
         ],
+        ComponentType.STONE: [
+            ((0, 0, 0), "minecraft:stone", {}),
+        ],
+        ComponentType.REDSTONE_WIRE: [
+            ((0, 0, 0), "minecraft:redstone_wire", {"power": "0"}),
+        ],
+        ComponentType.GLAZED_TERRACOTTA: [
+            ((0, 0, 0), "minecraft:magenta_glazed_terracotta", {"facing": "north"}),
+        ],
+        ComponentType.GLASS: [
+            ((0, 0, 0), "minecraft:glass", {}),
+        ],
     }
     
     def __init__(self):
@@ -162,6 +174,13 @@ class Compiler:
                 print("Phase 5: Routing signals...")
             self._route_signals(voxel_grid, logical_graph)
             
+            # Phase 5.5: Validate no floating blocks (after routing)
+            floating_errors = self._validate_floating_blocks(voxel_grid)
+            if floating_errors:
+                for err in floating_errors:
+                    result.errors.append(f"Floating block: {err}")
+                return result
+            
             # Phase 6: Apply timing (insert repeaters)
             if self.options.verbose:
                 print("Phase 6: Timing synchronization...")
@@ -209,7 +228,9 @@ class Compiler:
                 # These override the defaults in COMPONENT_BLOCKS
                 relevant_props = [
                     'facing', 'delay', 'mode', 'face', 'type', 'enabled', 
-                    'powered', 'locked', 'open'
+                    'powered', 'locked', 'open', 'power',
+                    'north', 'south', 'east', 'west',  # Redstone wire connections
+                    'attachment', 'extended', 'short',  # Pistons
                 ]
                 
                 for prop in relevant_props:
@@ -223,23 +244,59 @@ class Compiler:
                 
                 block = Block(material=material, properties=merged_props)
                 grid.set_block(bx, by, bz, block)
-                
-                # Place supporting block underneath components that need it
-                needs_support = any(x in material for x in [
-                    'piston', 'repeater', 'comparator', 'redstone_wire', 
-                    'pressure_plate', 'button', 'lever', 'torch'
-                ])
-                if needs_support:
-                    support = Block(material="minecraft:stone", properties={})
-                    grid.set_block(bx, by - 1, bz, support)
         
         return grid
+    
+    def _validate_floating_blocks(self, grid: VoxelGrid) -> List[str]:
+        """Validate that blocks requiring support have a solid block underneath."""
+        errors = []
+        
+        # Materials that require support underneath
+        needs_support = [
+            'minecraft:redstone_wire',
+            'minecraft:stone_button',
+            'minecraft:lever',
+            'minecraft:stone_pressure_plate',
+        ]
+        
+        # Non-solid materials that cannot provide support
+        non_solid = [
+            'minecraft:air',
+            'minecraft:redstone_wire',
+            'minecraft:stone_button',
+            'minecraft:lever',
+            'minecraft:stone_pressure_plate',
+            'minecraft:repeater',
+            'minecraft:comparator',
+            'minecraft:redstone_torch',
+            'minecraft:piston',
+            'minecraft:sticky_piston',
+        ]
+        
+        for (x, y, z), block in grid.blocks.items():
+            if block.material in needs_support:
+                # Check if there's a solid block underneath
+                below = grid.get_block(x, y - 1, z)
+                if below is None or below.material in non_solid:
+                    errors.append(f"{block.material} at ({x}, {y}, {z}) requires a solid support block underneath")
+        
+        return errors
     
     def _get_component_position(self, component: Component, index: int) -> Tuple[int, int, int]:
         """Get the world position for a component"""
         # Check if position is specified in properties
+        # Check if position is specified in properties
         if 'position' in component.properties:
             pos_str = component.properties['position']
+            # Parse position string like "(0, 0, 0)"
+            if isinstance(pos_str, str):
+                pos_str = pos_str.strip("()")
+                parts = [int(x.strip()) for x in pos_str.split(",")]
+                return tuple(parts)
+            elif isinstance(pos_str, tuple):
+                return pos_str
+        elif 'pos' in component.properties:
+            pos_str = component.properties['pos']
             # Parse position string like "(0, 0, 0)"
             if isinstance(pos_str, str):
                 pos_str = pos_str.strip("()")
@@ -290,14 +347,36 @@ class Compiler:
                     signal_strength=conn.signal_strength, delay=conn.min_delay)
                 
                 if success:
-                    # Place redstone wire along path
+                    # Non-solid materials that cannot support redstone
+                    non_solid = [
+                        'minecraft:air',
+                        'minecraft:redstone_wire',
+                        'minecraft:stone_button',
+                        'minecraft:lever',
+                        'minecraft:stone_pressure_plate',
+                        'minecraft:repeater',
+                        'minecraft:comparator',
+                        'minecraft:redstone_torch',
+                    ]
+                    
+                    # Place redstone wire along path with support blocks
                     for i, (x, y, z) in enumerate(path[1:-1], 1):  # Skip endpoints
+                        # Check if position already has a non-air block
+                        existing = grid.get_block(x, y, z)
+                        if existing is not None and existing.material != 'minecraft:air':
+                            # Skip if there's already something here
+                            continue
+                        
+                        # First ensure support exists below (place stone if needed)
+                        below = grid.get_block(x, y - 1, z)
+                        if below is None or below.material in non_solid:
+                            support = Block(material="minecraft:stone", properties={})
+                            grid.set_block(x, y - 1, z, support)
+                        
+                        # Now place the wire
                         wire = Block(material="minecraft:redstone_wire", 
                                    properties={"power": "15"})
                         grid.set_block(x, y, z, wire)
-                        # Place support block under wire
-                        support = Block(material="minecraft:stone", properties={})
-                        grid.set_block(x, y - 1, z, support)
 
 
 def compile_file(input_path: str, output_path: Optional[str] = None, optimize: bool = True) -> CompileResult:

@@ -6,18 +6,39 @@
 program: statement*
 
 ?statement: definition
+          | module_def
           | connection
           | action
           | control_flow
+          | control_flow
+          | assertion
+          | import_stmt
+          | from_import
+
+// Import Statements
+import_stmt: IMPORT_KW STRING
+
+from_import: FROM_KW STRING IMPORT_KW (STAR | module_list)
+
+module_list: CNAME ("," CNAME)*
+
+// Module Definitions
+module_def: MODULE_KW CNAME "(" param_list? ")" block
+
+param_list: CNAME ("," CNAME)*
 
 // Component Definitions
-definition: CNAME "=" COMPONENT_TYPE "(" parameters? ")"
+definition: DEF_KW CNAME type_name "(" parameters? ")"
 
-COMPONENT_TYPE: "Door" | "Piston" | "StickyPiston" | "Repeater" | "Lever" | "Lamp" | "Observer" | "Dropper" | "Comparator" | "Hopper" | "Target" | "SlimeBlock" | "HoneyBlock" | "RedstoneTorch" | "PressurePlate" | "Button"
+type_name: COMPONENT_TYPE | CNAME
+
+COMPONENT_TYPE: "Door" | "Piston" | "StickyPiston" | "Repeater" | "Lever" | "Lamp" | "Observer" | "Dropper" | "Comparator" | "Hopper" | "Target" | "SlimeBlock" | "HoneyBlock" | "RedstoneTorch" | "PressurePlate" | "Button" | "Stone" | "RedstoneWire" | "GlazedTerracotta" | "Glass" | "piston" | "sticky_piston" | "repeater" | "lever" | "lamp" | "observer" | "dropper" | "comparator" | "hopper" | "target" | "slime_block" | "honey_block" | "redstone_torch" | "pressure_plate" | "button" | "stone" | "redstone_wire" | "glazed_terracotta" | "glass"
+
+DEF_KW: "def"
 
 parameters: parameter ("," parameter)*
 
-parameter: CNAME ":" value
+parameter: CNAME "=" expression
 
 // Signal Connections
 connection: port_ref "->" port_ref
@@ -29,25 +50,70 @@ action: CNAME "." CNAME "(" arguments? ")"
 
 arguments: argument ("," argument)*
 
-argument: CNAME ":" value
-        | value
+argument: CNAME "=" expression
+        | expression
 
 // Control Flow
-control_flow: PARALLEL_KW "{" statement* "}"
-            | SEQUENCE_KW "{" statement* "}"
+control_flow: PARALLEL_KW block
+            | SEQUENCE_KW block
             | WAIT_KW "(" NUMBER ")"
+            | for_loop
+            | if_stmt
+
+block: "{" statement* "}"
+
+for_loop: FOR_KW CNAME "in" range_expr block
+range_expr: "range" "(" expression "," expression ")"
+
+if_stmt: IF_KW "(" bool_expr ")" block (ELSE_KW block)?
+
+// Assertions
+assertion: ASSERT_KW "(" bool_expr ")"
+
+bool_expr: expression "==" expression -> eq
+         | expression "!=" expression -> neq
+         | expression "<" expression -> lt
+         | expression ">" expression -> gt
+         | expression "<=" expression -> le
+         | expression ">=" expression -> ge
+
+// Expressions
+?expression: term
+           | expression "+" term -> add
+           | expression "-" term -> sub
+
+?term: factor
+     | term "*" factor -> mul
+     | term "/" factor -> div
+
+?factor: atom
+       | "(" expression ")"
+
+?atom: NUMBER
+     | CNAME
+     | STRING
+     | tuple
+     | property_access
+
+property_access: CNAME "." CNAME
 
 PARALLEL_KW: "parallel"
 SEQUENCE_KW: "sequence"  
 WAIT_KW: "wait"
+ASSERT_KW: "assert"
+IMPORT_KW: "import"
+FROM_KW: "from"
+MODULE_KW: "module"
+FOR_KW: "for"
+IF_KW: "if"
+ELSE_KW: "else"
+
+STAR: "*"
 
 // Values
-?value: tuple
-      | STRING
-      | NUMBER
-      | CNAME
+?value: expression
 
-tuple: "(" NUMBER "," NUMBER "," NUMBER ")"
+tuple: "(" expression "," expression "," expression ")"
 
 // Terminals
 CNAME: /[a-zA-Z_][a-zA-Z0-9_]*/

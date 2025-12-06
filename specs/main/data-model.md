@@ -1,39 +1,91 @@
-# Data Model: Extended Redstone Features
+# Data Model: Advanced Debugging & Components
 
-## 1. Component Types
-New additions to `ComponentType` enum:
+## 1. Logical Graph Extensions
 
-| Type | Properties | Description |
-|------|------------|-------------|
-| `REPEATER` | `delay` (1-4), `locked` (bool) | Signal repeater/delayer |
-| `COMPARATOR` | `mode` ("compare", "subtract") | Logic comparator |
-| `OBSERVER` | `facing` (direction) | Detects block updates |
-| `DROPPER` | `facing` (direction) | Drops items |
-| `HOPPER` | `facing` (direction), `enabled` (bool) | Moves items |
-| `TARGET` | None | Redirects redstone |
-| `SLIME_BLOCK` | None | Sticky block |
-| `HONEY_BLOCK` | None | Sticky block (doesn't stick to slime) |
-| `REDSTONE_TORCH` | `facing` (direction) | Inverts signal |
-| `PRESSURE_PLATE` | `type` ("stone", "wood", "heavy", "light") | Input source |
-| `BUTTON` | `type` ("stone", "wood"), `face` (wall/floor/ceiling) | Input pulse |
+### 1.1 Module Definition
+Represents a reusable component definition.
+```python
+@dataclass
+class ModuleDefinition:
+    name: str
+    parameters: List[str]
+    body: List[ASTNode]
+```
 
-## 2. Block Properties
-Standardized properties for compilation:
+### 1.2 Module Instance
+Represents a usage of a module.
+```python
+@dataclass
+class ModuleInstance(Component):
+    module_name: str
+    arguments: Dict[str, Any]
+```
 
-- **Facing**: `north`, `south`, `east`, `west`, `up`, `down`.
-- **Delay**: Integer `1`, `2`, `3`, `4`.
-- **Mode**: `compare`, `subtract`.
-- **Face**: `floor`, `wall`, `ceiling`.
+## 2. Debugging System
 
-## 3. Kinematic Graph
-Updated `LogicalGraph` to support:
-- **Cluster Nodes**: Groups of blocks moved together by pistons (via Slime/Honey).
-- **Strong/Weak Power**: Distinction for Target Blocks and Repeaters.
+### 2.1 Assertion
+Represents a verification step in the simulation.
+```python
+@dataclass
+class Assertion:
+    target: str  # Component ID or name
+    property: str # e.g., "powered", "position"
+    expected_value: Any
+    tick: int # Simulation tick to check
+```
 
-## 4. Viewer Entities
-- **Models**: Need simple geometric approximations (cubes, torches, plates).
-- **Colors**:
-  - Slime: Green transparent
-  - Honey: Orange transparent
-  - Target: White/Red rings
-  - Repeater/Comparator: Stone slab-like
+### 2.2 Debug Context
+Stores the state of the debugging session.
+```python
+@dataclass
+class DebugContext:
+    breakpoints: Set[int] # Ticks to pause at
+    current_tick: int
+    history: List[Dict[str, Any]] # State history for time travel/inspection
+```
+
+## 3. Compiler Extensions
+
+### 3.1 Deterministic ID Generation
+Replace `uuid.uuid4()` with a deterministic generator.
+```python
+class IDGenerator:
+    def __init__(self):
+        self.counters = defaultdict(int)
+    
+    def generate(self, prefix: str) -> str:
+        self.counters[prefix] += 1
+        return f"{prefix}_{self.counters[prefix]}"
+```
+
+## 4. Control Flow Extensions (NEW)
+
+### 4.1 For Loop
+Represents a compile-time loop.
+```python
+@dataclass
+class ForLoop(ASTNode):
+    variable: str
+    start: int
+    end: int
+    body: List[ASTNode]
+```
+
+### 4.2 If Statement
+Represents a compile-time conditional.
+```python
+@dataclass
+class IfStatement(ASTNode):
+    condition: str # Expression string
+    true_body: List[ASTNode]
+    false_body: List[ASTNode]
+```
+
+### 4.3 Glass Component
+New component type for semi-solid blocks.
+```python
+class ComponentType(Enum):
+    # ... existing types ...
+    GLASS = "glass"
+```
+

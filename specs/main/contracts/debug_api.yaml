@@ -1,0 +1,53 @@
+openapi: 3.0.0
+info:
+  title: RedScript Debugger API
+  version: 1.0.0
+paths:
+  /debug/session:
+    post:
+      summary: Start a debug session
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                source_file:
+                  type: string
+  /debug/step:
+    post:
+      summary: Advance simulation by one tick
+  /debug/state:
+    get:
+      summary: Get current circuit state
+      responses:
+        '200':
+          description: Current state of all components
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+                  properties:
+                    powered:
+                      type: boolean
+                    position:
+                      type: array
+                      items:
+                        type: integer
+  /debug/command:
+    post:
+      summary: Execute a debug command (toggle, set_position)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                command:
+                  type: string
+                args:
+                  type: array
+                  items:
+                    type: string

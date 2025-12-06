@@ -62,9 +62,15 @@ class SpectatorController(Entity):
         if self.look_text:
             hit = raycast(self.position, self.forward, distance=100, ignore=[self])
             if hit.hit and hit.entity:
-                # hit.entity.position is local to grid_parent, so it matches grid coordinates
-                pos = hit.entity.position
-                self.look_text.text = f"Looking at: ({int(pos.x)}, {int(pos.y)}, {int(pos.z)})"
+                # Check for block_data
+                if hasattr(hit.entity, 'block_data'):
+                    bd = hit.entity.block_data
+                    props = ", ".join([f"{k}={v}" for k, v in bd.properties.items()])
+                    self.look_text.text = f"Looking at: {bd.material} {bd.position}\nProps: {props}"
+                else:
+                    # hit.entity.position is local to grid_parent, so it matches grid coordinates
+                    pos = hit.entity.position
+                    self.look_text.text = f"Looking at: ({int(pos.x)}, {int(pos.y)}, {int(pos.z)})"
             else:
                 self.look_text.text = "Looking at: None"
         

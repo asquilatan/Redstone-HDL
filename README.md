@@ -1,6 +1,6 @@
-# RedScript HDL
+# RedScript
 
-RedScript is a Hardware Description Language (HDL) for Minecraft Redstone. It allows you to define circuits using high-level code and compile them into Litematica schematics.
+RedScript (formerly RedScript HDL) is a Hardware Description Language (HDL) for Minecraft Redstone. It allows you to define circuits using high-level code and compile them into Litematica schematics.
 
 ## Features
 
@@ -16,18 +16,12 @@ RedScript is a Hardware Description Language (HDL) for Minecraft Redstone. It al
 - **Mechanics**: Piston, Sticky Piston, Slime Block, Honey Block
 - **Input/Output**: Button, Pressure Plate, Lamp, Target Block, Note Block, Dropper, Hopper, Observer
 
-## Installation
-
-```bash
-pip install redscript
-```
-
 ## Usage
 
 1. Write your script (e.g., `circuit.rs`):
    ```rust
-   button = Button(position: (0, 5, 0))
-   lamp = Lamp(position: (2, 5, 0))
+   def button Button(pos=(0, 5, 0))
+   def lamp Lamp(pos=(2, 5, 0))
    button.signal -> lamp.power
    ```
 
@@ -36,13 +30,130 @@ pip install redscript
    redscript compile circuit.rs --view
    ```
 
-## Extended Features
+## Syntax Guide
 
-RedScript now supports:
-- **Repeaters**: Configurable delay (1-4 ticks).
-- **Comparators**: Compare and Subtract modes.
-- **Slime/Honey Blocks**: Sticky mechanics with push limit checks (12 blocks).
-- **Target Blocks**: Redirection of redstone wire.
-- **Spectator Mode**: Fly through your circuit in the 3D viewer (WASD + Mouse).
+### 1. Defining Components
+Components are the building blocks of your circuit. You define them using the `def` keyword.
 
-ps: Hail Specify, Gemini 3.0 Pro, and Opus 4.5.
+```rust
+// Define a stone block at (0, 0, 0)
+def s1 Stone(pos=(0, 0, 0))
+
+// Define a piston facing up
+def p1 Piston(pos=(0, 1, 0), facing="up")
+
+// Define a sticky piston facing north
+def sp StickyPiston(pos=(0, 2, 0), facing="north")
+
+// Define a repeater with 2 ticks delay
+def r1 Repeater(pos=(1, 0, 0), delay=2, facing="east")
+```
+
+### 2. Modules
+Modules allow you to create reusable sub-circuits. They act like functions that can instantiate multiple components.
+
+#### Defining a Module
+Create a module in a purely definition file (e.g., `lib.rs`) or at the top of your script.
+
+```rust
+// A simple module that places a piston and a block on top
+module PistonPusher(x, y, z) {
+    def p Piston(pos=(x, y, z), facing="up")
+    def b Stone(pos=(x, y+1, z))
+}
+```
+
+#### Using a Module
+Instantiate a module just like a component.
+
+```rust
+// Create one pusher
+def pusher1 PistonPusher(x=10, y=5, z=10)
+```
+
+### 3. Imports
+Split your code into multiple files for better organization.
+
+#### Basic Import
+Import all modules from another file.
+
+```rust
+import "modules/my_lib.rs"
+
+def m MyModule(x=0)
+```
+
+#### Selective Import
+Import only specific modules.
+
+```rust
+from "modules/mechanisms.rs" import PistonDoor, Extender
+
+def door PistonDoor(x=0, y=4, z=0)
+```
+
+### 4. Control Flow
+Use loops and conditionals to procedurally generate circuits.
+
+#### Loops
+Great for creating arrays of components.
+
+```rust
+// Create a row of 10 lamps
+for i in range(0, 10) {
+    def lamp Lamp(pos=(i, 0, 0))
+}
+```
+
+#### Conditionals
+Conditional logic based on parameters.
+
+```rust
+module SmartColumn(height, has_light) {
+    for y in range(0, height) {
+        def block Stone(pos=(0, y, 0))
+        
+        if (has_light == 1) {
+            def l Lamp(pos=(1, y, 0))
+        }
+    }
+}
+```
+
+## Debugging
+
+RedScript includes a powerful debug mode for stepping through your circuit's logic.
+
+```bash
+redscript compile circuit.rs --debug
+```
+
+- **Step-by-Step**: Execute one tick at a time.
+- **Inspect**: View component states and signal strengths.
+- **Assert**: Verify circuit behavior with `assert(condition)`.
+
+## Interactive Viewer
+
+The 3D viewer now supports:
+- **Textures**: Blocks are rendered with 16x16 textures.
+- **Interaction**: Click buttons/levers to toggle, right-click repeaters to cycle delay.
+- **Block Info**: Hover over blocks to see details.
+- **Export**: Press F10 to export to `.litematic`.
+
+## Export
+
+You can export your design to a Litematica schematic:
+
+```bash
+redscript export my_design.rs --output my_design.litematic
+```
+
+## Why did I make this?
+
+I wanted to see AI create complex Redstone contraptions in Minecraft. However, I noticed that while AI models are great at logic, they struggle with the spatial layout and specific NBT data required for raw schematic generation. The outputs are often garbage or non-functional because the AI doesn't have the "right tools" to express its intent.
+
+**RedScript acts as an intermediate step between AI and Minecraft Schematics.**
+
+In the same way that **Assembly** acts as an intermediary between high-level languages and machine code, RedScript provides a structured, logical way to describe hardware. It handles the nitty-gritty details of block states, coordinate mapping, and file formats (Litematic), allowing the AI (or human) to focus on the *logic* and *design* of the circuit.
+
+By giving AI a formal language to write, we unlock the potential for it to design true hardware in Minecraft.

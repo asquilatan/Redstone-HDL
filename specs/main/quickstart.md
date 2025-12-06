@@ -1,44 +1,71 @@
-# Quickstart: Extended Features
+# Quickstart: Advanced Debugging & Components
 
-## Using New Components
+## 1. Using Modules
+Define reusable components with `module`.
 
 ```redscript
-definition Main {
-    # Timing with Repeaters
-    rep1 = Repeater(delay: 4)
-    rep2 = Repeater(delay: 2)
+module DoublePistonExtender {
+    p1 = StickyPiston(facing: up)
+    p2 = StickyPiston(facing: up)
     
-    # Logic with Comparators
-    comp = Comparator(mode: "subtract")
-    
-    # Sticky Mechanics
-    piston = StickyPiston(facing: up)
-    slime = SlimeBlock(position: (0, 1, 0))
-    block = Block("minecraft:stone", position: (0, 2, 0))
-    
-    # Inputs
-    btn = Button(type: "stone", face: "wall")
-    plate = PressurePlate(type: "heavy")
-    
-    # Connections
-    btn.signal -> rep1.input
-    rep1.output -> comp.side
-    plate.signal -> comp.rear
-    comp.output -> piston.power
+    p1.head -> p2.base
 }
+
+# Instantiate
+dpe = DoublePistonExtender()
 ```
 
-## Using the Viewer
+## 2. Debugging with Assertions
+Verify your circuit behaves as expected.
 
-Launch the viewer with:
+```redscript
+lever = Lever()
+lamp = Lamp()
+
+lever.signal -> lamp.power
+
+# Assert lamp is off initially
+assert(lamp.powered == false)
+
+# Simulate interaction
+lever.toggle()
+
+# Assert lamp turns on
+assert(lamp.powered == true)
+```
+
+## 3. Manual State Manipulation
+Directly modify block state for testing.
+
+```redscript
+piston = Piston()
+
+# Force piston to extend
+piston.set_extended(true)
+
+# Move a block manually
+block = Stone(position: (0, 10, 0))
+block.setPosition(0, 11, 0)
+```
+
+## 4. Debug Mode CLI
+Run the compiler in debug mode to step through simulation.
+
 ```bash
-python src/redscript/cli/main.py view my_circuit.rs
+redscript compile my_circuit.rs --debug
 ```
 
-**Controls**:
-- **W/A/S/D**: Move horizontally
-- **Space**: Move Up
-- **Shift**: Move Down
-- **Mouse**: Look around
-- **Scroll**: Adjust movement speed
-- **Right Click**: Toggle mouse capture (if needed)
+Output:
+```text
+Tick 0:
+  lever: off
+  lamp: off
+> step
+Tick 1:
+  lever: on (toggled)
+  lamp: off (delay)
+> step
+Tick 2:
+  lever: on
+  lamp: on
+```
