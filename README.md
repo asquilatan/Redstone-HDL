@@ -150,10 +150,6 @@ redscript export my_design.rs --output my_design.litematic
 
 ## Why did I make this?
 
-I wanted to see AI create complex Redstone contraptions in Minecraft. However, I noticed that while AI models are great at logic, they struggle with the spatial layout and specific NBT data required for raw schematic generation. The outputs are often garbage or non-functional because the AI doesn't have the "right tools" to express its intent.
+I wanted to see AI create decently complex redstone contraptions in Minecraft. However, going through the YouTube dumpster fire that is "I Asked AI To Make Redstone For Me" slop, I realized that clankers like ChatGPT and Gemini weren't being given a structured, machine-readable language for describing redstone logic. I was appalled, not by the work of the AI (because it's obviously garbage, duh), but by incompetence of the creators for not providing that essential tool in the first place. So I made RedScript, which acts as an intermediate step between AI and Minecraft Schematics. 
 
-**RedScript acts as an intermediate step between AI and Minecraft Schematics.**
-
-In the same way that **Assembly** acts as an intermediary between high-level languages and machine code, RedScript provides a structured, logical way to describe hardware. It handles the nitty-gritty details of block states, coordinate mapping, and file formats (Litematic), allowing the AI (or human) to focus on the *logic* and *design* of the circuit.
-
-By giving AI a formal language to write, we unlock the potential for it to design true hardware in Minecraft.
+In hindsight, I probably could've just read the .litematic files but whatever.
