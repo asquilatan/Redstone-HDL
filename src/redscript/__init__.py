@@ -1,7 +1,7 @@
 """
 RedScript package initialization
 """
-__version__ = '0.1.0'
+__version__ = '0.1.0a1'
 __author__ = 'Redstone HDL Contributors'
 
 from .compiler.compiler import Compiler

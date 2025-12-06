@@ -49,7 +49,7 @@ if PYBIND11_AVAILABLE and os.environ.get('REDSCRIPT_BUILD_CPP', '0') == '1':
 
 setup(
     name='redscript',
-    version='0.1.0',
+    version='0.1.0a1',
     author='Redstone HDL Contributors',
     description='A Minecraft Redstone HDL compiler',
     packages=['redscript', 'redscript.compiler', 'redscript.solver', 'redscript.viewer', 'redscript.cli', 'redscript.utils'],
